@@ -11,6 +11,8 @@ var mongoUri = process.env.MONGOLAB_URI ||
 var syncWait = 1000 * 60 * 5; // 5 minutes
 
 var db = mongoose.connection;
+
+mongoose.connect( mongoUri );
 db.on( 'error', console.error );
 db.once( 'open', function() {
   var subwayLineSchema = new mongoose.Schema({
@@ -23,35 +25,21 @@ db.once( 'open', function() {
   });
   subwayLineSchema.index( { name: 1 } );
   var SubwayLine = mongoose.model( 'SubwayLine', subwayLineSchema );
-} );
 
-mongoose.connect( mongoUri );
 
 var request = http.get( mta ).on( 'response', function( response ) {
   var xml = new xmlStream( response );
-  MongoClient.connect(mongoUri, function(err, db) {
-    test.equal(null, err);
-    test.ok(db != null);
-
-    xml.on( 'endElement: subway > line', function( line ) {
-        console.log( line );
-        SubwayLine.findOne( { name: line.name }, function( err, subwayLine ) {
-          subwayLine.status = line.status;
-          subwayLine.notice = line.text;
-          subwayLine.date = line.date;
-          subwayLine.time = line.time;
-          subwayLine.updateDate = Date.now;
-        } );
-        status = line.status;
-        db.collection("subwaylines").update( {a:1}, {b:1}, {upsert:true}, function(err, result) {
-          test.equal(null, err);
-          test.equal(1, result);
-
-          db.close();
-          test.done();
-        });
-        //res.json( { 'status': status } );
-    } );
-  });
+  xml.on( 'endElement: subway > line', function( line ) {
+      console.log( 'Working on ' + line.name );
+      //line.updateDate = Date.now;
+      SubwayLine.findOneAndUpdate( { name: line.name }, line, { upsert: true }, function( err, subwayLine ) {
+        if ( err ) return console.error( err );
+        console.log( 'Upserted ' + subwayLine.name );
+      } );
+  } );
 } );
+
+} );
+
+
 
