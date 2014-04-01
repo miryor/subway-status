@@ -1,10 +1,19 @@
 // web.js
 var express = require("express");
 var logfmt = require("logfmt");
-var http = require("http");
-var xmlStream = require('xml-stream');
 var jade = require('jade');
-var mta = { host: 'web.mta.info', path: '/status/serviceStatus.txt' };
+var mongoose = require('mongoose');
+var SubwayLine = require( './models/subwayline' ).SubwayLine;
+
+var mongoUri = process.env.MONGOLAB_URI ||
+  process.env.MONGOHQ_URL ||
+  'mongodb://localhost/subwaystatus';
+var db = mongoose.connection;
+mongoose.connect( mongoUri );
+db.on( 'error', console.error );
+db.once( 'open', function() {
+} );
+
 var app = express();
 app.set('views', __dirname + '/views');
 app.set('view engine', 'jade');
@@ -16,15 +25,14 @@ app.get('/', function(req, res) {
 
 app.get('/status/:id', function(req, res) {
   var status = 'NOT FOUND';
-  var request = http.get( mta ).on( 'response', function( response ) {
-    var xml = new xmlStream( response );
-    xml.on( 'endElement: line', function( line ) {
-      if ( line.name == req.params.id ) {
-        console.log( line );
-        status = line.status;
-        res.json( { 'status': status } );
-      }
-    } );
+  SubwayLine.findOne( { name: req.params.id }, function( err, subwayLine ) {
+    if ( err ) return console.error( err );
+    if ( subwayLine ) {
+      res.json( { 'status': subwayLine.status } );
+    }
+    else {
+      res.json( { 'status': status } );
+    }
   } );
 });
 
